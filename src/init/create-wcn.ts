@@ -4,8 +4,8 @@
 
 import { setWasmMemory, setWasmExports, setWasmTable, updateMemoryViews } from "./memory";
 import { setStackFunctions } from "./stack";
-import { bindExports, _malloc } from "./exports";
-import { setMallocRef, Init_WCNJS, Init_WGPUTextureView_Map, js_load_font, js_get_glyph_metrics, js_generate_bitmap } from "./font";
+import { bindExports, _malloc, _free } from "./exports";
+import { setMallocRef, setFreeRef, Init_WCNJS, Init_WGPUTextureView_Map, js_load_font, js_get_glyph_metrics, js_generate_bitmap, js_prerender_text, js_prerender_common } from "./font";
 import { _fd_close, _fd_seek, _fd_write, __abort_js, _emscripten_resize_heap, segfault, alignfault } from "./syscalls";
 import {
 	freeWGPUTextureView, wasm_begin_render_pass, wasm_create_bind_group, wasm_create_bind_group_layout,
@@ -47,7 +47,7 @@ export async function createWCN(options: CreateWCNOptions): Promise<void> {
 		Init_WCNJS, Init_WGPUTextureView_Map, _abort_js: __abort_js, alignfault,
 		emscripten_resize_heap: _emscripten_resize_heap, emscripten_webgpu_get_device: _emscripten_webgpu_get_device,
 		fd_close: _fd_close, fd_seek: _fd_seek, fd_write: _fd_write, freeWGPUTextureView,
-		js_generate_bitmap, js_get_glyph_metrics, js_load_font, segfault,
+		js_generate_bitmap, js_get_glyph_metrics, js_load_font, js_prerender_text, js_prerender_common, segfault,
 		wasm_begin_render_pass, wasm_create_bind_group, wasm_create_bind_group_layout, wasm_create_buffer,
 		wasm_create_compute_bind_group, wasm_create_compute_bind_group_layout, wasm_create_compute_pipeline,
 		wasm_create_pipeline_layout, wasm_create_render_pipeline, wasm_create_sampler, wasm_create_sdf_bind_group,
@@ -93,6 +93,7 @@ export async function createWCN(options: CreateWCNOptions): Promise<void> {
 
 	bindExports(exports);
 	setMallocRef(_malloc);
+	setFreeRef(_free);
 
 	_initialized = true;
 }

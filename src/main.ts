@@ -169,22 +169,18 @@ fn edgeAwareAA(uv: vec2f, baseColor: vec3f) -> vec3f {
 	let grad = sobelGradient(uv);
 	let edgeStrength = length(grad);
 	
-	// 只在边缘处应用抗锯齿
-	if (edgeStrength < 0.05) {
-		return baseColor;
-	}
+	// 计算边缘法线方向 (避免除零)
+	let gradLen = max(length(grad), 0.0001);
+	let normal = grad / gradLen;
 	
-	// 计算边缘法线方向
-	let normal = normalize(grad);
-	
-	// 沿边缘法线方向采样
+	// 沿边缘法线方向采样 (必须在 uniform control flow 中)
 	let offset1 = normal * texelSize * 0.5;
 	let offset2 = normal * texelSize * -0.5;
 	
 	let sample1 = textureSample(inputTexture, inputSampler, uv + offset1).rgb;
 	let sample2 = textureSample(inputTexture, inputSampler, uv + offset2).rgb;
 	
-	// 基于边缘强度混合
+	// 基于边缘强度混合 (低边缘强度时 blendFactor 接近 0，相当于返回 baseColor)
 	let blendFactor = smoothstep(0.05, 0.3, edgeStrength) * 0.5;
 	return mix(baseColor, (sample1 + sample2) * 0.5, blendFactor);
 }
@@ -193,7 +189,7 @@ fn edgeAwareAA(uv: vec2f, baseColor: vec3f) -> vec3f {
 fn fxaaLite(uv: vec2f, baseColor: vec3f) -> vec3f {
 	let texelSize = 1.0 / uniforms.resolution;
 	
-	// 采样周围像素
+	// 采样周围像素 (必须在 uniform control flow 中)
 	let n = textureSample(inputTexture, inputSampler, uv + vec2f(0.0, -1.0) * texelSize).rgb;
 	let s = textureSample(inputTexture, inputSampler, uv + vec2f(0.0,  1.0) * texelSize).rgb;
 	let e = textureSample(inputTexture, inputSampler, uv + vec2f( 1.0, 0.0) * texelSize).rgb;
@@ -211,22 +207,20 @@ fn fxaaLite(uv: vec2f, baseColor: vec3f) -> vec3f {
 	let lumMax = max(lumC, max(max(lumN, lumS), max(lumE, lumW)));
 	let lumRange = lumMax - lumMin;
 	
-	// 低对比度区域不处理
-	if (lumRange < 0.05) {
-		return baseColor;
-	}
-	
 	// 计算混合方向和权重
 	let lumNS = lumN + lumS;
 	let lumEW = lumE + lumW;
 	let isHorizontal = abs(lumNS - 2.0 * lumC) >= abs(lumEW - 2.0 * lumC);
 	
-	// 沿边缘方向混合
-	if (isHorizontal) {
-		return mix(baseColor, (n + s) * 0.5, 0.25);
-	} else {
-		return mix(baseColor, (e + w) * 0.5, 0.25);
-	}
+	// 预计算两个方向的混合结果
+	let blendH = mix(baseColor, (n + s) * 0.5, 0.25);
+	let blendV = mix(baseColor, (e + w) * 0.5, 0.25);
+	
+	// 使用 select 代替 if (uniform control flow)
+	// 低对比度时返回原色，否则根据方向选择混合结果
+	let blended = select(blendV, blendH, isHorizontal);
+	let hasEdge = lumRange >= 0.05;
+	return select(baseColor, blended, hasEdge);
 }
 
 // ============================================================================
